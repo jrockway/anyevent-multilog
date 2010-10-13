@@ -68,6 +68,12 @@ has 'errors' => (
     },
 );
 
+has 'is_shutdown' => (
+    init_arg  => undef,
+    accessor => 'is_shutdown',
+    isa      => 'Bool',
+);
+
 has 'leftover_data' => (
     init_arg  => undef,
     reader    => 'leftover_data',
@@ -78,6 +84,7 @@ has 'leftover_data' => (
 
 sub ensure_validity {
     my $self = shift;
+    confess 'already shutdown, cannot perform further operations' if $self->is_shutdown;
     confess(join ', ', $self->errors) if $self->has_errors;
 }
 
@@ -85,9 +92,10 @@ sub _build_job {
     my $self = shift;
 
     my $input = AnyEvent::Subprocess::Job::Delegate::Handle->new(
-        name      => 'input_handle',
-        direction => 'w',
-        replace   => 0,
+        name           => 'input_handle',
+        direction      => 'w',
+        replace        => 0,
+        want_leftovers => 1,
     );
 
     my $errors = AnyEvent::Subprocess::Job::Delegate::Handle->new(
@@ -116,10 +124,12 @@ sub _build_run {
 
     my $error_cb; $error_cb = sub {
         my ($h, $line, $eol) = @_;
-        $self->handle_stderror($line);
+        $self->handle_error($line);
         $h->push_read( line => $error_cb );
     };
     $errors->handle->push_read( line => $error_cb );
+
+    $run->delegate('input_handle')->handle->{linger} = 0;
 
     return $run;
 }
@@ -135,21 +145,28 @@ sub handle_completion {
     my ($self, $done) = @_;
     my ($success, $msg);
 
+    $self->set_leftover_data( $done->delegate('input_handle')->wbuf )
+        if $done->delegate('input_handle')->has_wbuf;
+
     if($done->exit_value == 111){
         $success = 0;
         $msg = 'out of memory, or another multilog '.
             'process is touching your files';
     }
 
-    if($done->is_success){
+    elsif($done->exit_value == 0 && $self->has_leftover_data ){
+        $success = 1;
+        $msg = 'normal exit, with leftover data';
+    }
+
+    elsif($done->is_success){
         $success = 1;
         $msg = 'normal exit';
     }
 
-    if($done->exit_value == 0 && $done->exit_signal == 15){
-        $success = 1;
-        $msg = 'exited with TERM signal, check leftover data';
-        $self->set_leftover_data('XXX');
+    else {
+        $success = 0;
+        $msg = 'abnormal exit';
     }
 
     $self->on_exit->($success, $msg, $done) if $self->has_exit_handler;
@@ -182,8 +199,7 @@ sub rotate {
 sub shutdown {
     my $self = shift;
     my $input = $self->run->delegate('input_handle');
-    confess 'already shutdown' if $input->handle->{_OH_NOES};
-    $input->handle->{_OH_NOES} = 1;
+    confess 'already shutdown, cannot perform further operations' if $self->is_shutdown;
     $input->handle->do_not_want;
 }
 
