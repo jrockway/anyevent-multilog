@@ -166,7 +166,7 @@ sub handle_completion {
 
     else {
         $success = 0;
-        $msg = 'abnormal exit';
+        $msg = 'abnormal exit with signal '. $done->exit_signal;
     }
 
     $self->on_exit->($success, $msg, $done) if $self->has_exit_handler;
@@ -202,5 +202,7 @@ sub shutdown {
     confess 'already shutdown, cannot perform further operations' if $self->is_shutdown;
     $input->handle->do_not_want;
 }
+
+__PACKAGE__->meta->make_immutable;
 
 1;
