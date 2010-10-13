@@ -169,6 +169,16 @@ sub push_write {
     $self->run->delegate('input_handle')->handle->push_write($line);
 }
 
+sub push_shutdown {
+    my $self = shift;
+    $self->run->kill('TERM');
+}
+
+sub rotate {
+    my $self = shift;
+    $self->run->kill('ALRM');
+}
+
 sub shutdown {
     my $self = shift;
     my $input = $self->run->delegate('input_handle');
