@@ -6,6 +6,8 @@ use MooseX::Types::Path::Class qw(File);
 use AnyEvent::Subprocess;
 use AnyEvent::Subprocess::Job::Delegate::Handle;
 
+our $VERSION = '0.01';
+
 use namespace::autoclean;
 
 has 'multilog' => (
