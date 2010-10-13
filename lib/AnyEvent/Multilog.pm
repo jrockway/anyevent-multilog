@@ -68,6 +68,14 @@ has 'errors' => (
     },
 );
 
+has 'leftover_data' => (
+    init_arg  => undef,
+    reader    => 'leftover_data',
+    writer    => 'set_leftover_data',
+    predicate => 'has_leftover_data',
+);
+
+
 sub ensure_validity {
     my $self = shift;
     confess(join ', ', $self->errors) if $self->has_errors;
@@ -119,12 +127,32 @@ sub _build_run {
 sub handle_error {
     my ($self, $msg) = @_;
     $self->on_error->($msg) if $self->has_error_handler;
+    $self->push_error($msg);
     return;
 }
 
 sub handle_completion {
     my ($self, $done) = @_;
-    $self->on_exit->($done) if $self->has_exit_handler;
+    my ($success, $msg);
+
+    if($done->exit_value == 111){
+        $success = 0;
+        $msg = 'out of memory, or another multilog '.
+            'process is touching your files';
+    }
+
+    if($done->is_success){
+        $success = 1;
+        $msg = 'normal exit';
+    }
+
+    if($done->exit_value == 0 && $done->exit_signal == 15){
+        $success = 1;
+        $msg = 'exited with TERM signal, check leftover data';
+        $self->set_leftover_data('XXX');
+    }
+
+    $self->on_exit->($success, $msg, $done) if $self->has_exit_handler;
     return;
 }
 

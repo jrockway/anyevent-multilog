@@ -13,7 +13,7 @@ my $done = AnyEvent->condvar;
 my $log = AnyEvent::Multilog->new(
     multilog => $path,
     script   => [qw/t +* /, $logfile],
-    on_exit  => sub { $done->send($_[0]) },
+    on_exit  => sub { $done->send(\@_) },
 );
 
 isa_ok $log, 'AnyEvent::Multilog';
@@ -23,12 +23,16 @@ $log->push_write('hello there');
 $log->push_write('this is a test');
 $log->shutdown;
 
-my $status = $done->recv;
-ok $status->is_success, 'exited ok';
+my ($success, $msg, $status) = @{$done->recv || []};
+ok $success, 'exited ok 1';
+is $msg, 'normal exit', 'got advice';
+
+ok !$log->has_leftover_data, 'no leftover data';
 
 my $logdir = $tmp->exists('foo');
 ok $logdir, 'created log dir';
 ok -d $logdir, 'is a dir';
+
 my $cur = $tmp->exists('foo/current');
 ok $cur, 'got current file';
 ok -f $cur, 'current is a file';
