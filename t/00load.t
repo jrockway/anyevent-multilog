@@ -2,9 +2,12 @@ use strict;
 use warnings;
 use Test::More;
 
-use ok 'AnyEvent::Multilog';
 use t::lib::multilog qw(check_multilog);
 
-check_multilog 1;
+BEGIN {
+    check_multilog 1;
+}
+
+use ok 'AnyEvent::Multilog';
 
 done_testing;
