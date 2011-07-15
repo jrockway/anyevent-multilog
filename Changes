@@ -1,5 +1,7 @@
 Change history for AnyEvent-Multilog
 {{$NEXT}}
+
+1.102861 Fri Jul 15 05:53:47 CDT 2011
   - skip_all instead of BAIL_OUT for cpantesters sanity
   - dist.ini cleanup
 
